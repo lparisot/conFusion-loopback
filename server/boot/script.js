@@ -49,7 +49,7 @@ module.exports = function(app) {
     );
     createUser(
       app,
-      {username: 'lpa', email: 'lpa@ici.com', password: 'azerty'},
+      {username: 'common', email: 'common@common.com', password: 'azerty'},
       ''
     );
   });
