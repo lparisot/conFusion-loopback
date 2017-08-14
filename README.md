@@ -307,7 +307,10 @@ Response Body:
 ]
 ```
 
-10. Do a get on the Comments adding a filter to retrieve informations on the Customer and the Dish
+10. Do a get on the Comments adding a filter to retrieve informations on the Customer and the Dish.
+
+The filter: {"include":["dishes", "customer"]}
+
 ```bash
 $ curl -X GET --header 'Accept: application/json' 'http://localhost:3000/api/Comments?filter=%7B%22include%22%3A%5B%22dishes%22%2C%20%22customer%22%5D%7D&access_token=WaGmnECNgdBjD9e3Y15VscKzNafqhFsECrROadcEdRguiZzFtEf1LOw2YkiNk83v'
 ```
