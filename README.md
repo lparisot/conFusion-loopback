@@ -75,8 +75,127 @@ $ lb acl
   role: admin
   Explicitly grant access
 ```
-
 When running the server, an admin user will be created automatically if needed. See server/boot/script.js
+
+Add a new model called Comments:
+```bash
+$ lb model
+  Enter the model name : Comments
+  Select the data-source to attach Comments to : MongoDB
+  Select model's base class:  PersistedModel
+  Expose Customer viar the REST API? Yes
+  Custom plural form (used to build REST URL) : Comments
+  Common model or server only ? common
+  Properties:
+    Name: rating
+    Type: number
+    Required: Yes
+    Default: 5
+    Name: comment
+    Type: String
+    Required: Yes
+    Default: (empty)
+```
+
+Configure ACL for Comments:
+1. An admin user can write and update items in dishes
+```bash
+$ lb acl
+  Model: dishes
+  Scope: All methods and properties
+  access type: Write
+  role: other
+  role name: admin
+  Permission: Explicitly grant access
+```
+2. restrict access to everybody on comments
+```bash
+$ lb acl
+  Model: Comments
+  Scope: All methods and properties
+  access type: All
+  role: All users
+  Permission: Explicitly deny access
+```
+3. allow customers to read comments
+```bash
+$ lb acl
+  Model: Comments
+  Scope: All methods and properties
+  access type: Read
+  role: Any authenticated user
+  Permission: Explicitly grant access
+```
+4. allow customers to post comments
+```bash
+$ lb acl
+  Model: Comments
+  Scope: A single method
+  method name: create
+  role: Any authenticated user
+  Permission: Explicitly grant access
+```
+5. allow a customer that posted a comment to edit or delete the comment
+```bash
+$ lb acl
+  Model: Comments
+  Scope: All methods and properties
+  access type: Write
+  role: The user owning the object
+  Permission: Explicitly grant access
+```
+
+Add relations between dishes, customers and comments:
+
+1. A dish can have many comments:
+```bash
+$ lb relation
+  Model: dishes
+  Relation type: has many
+  Relationship with: Comments
+  Name: comments
+  Foreign key: none
+  Through model: no
+```
+2. Many customers can post a comment on a dish:
+```bash
+$ lb relation
+  Model: dishes
+  Relation type: has many
+  Relationship with: Customer
+  Name: customers
+  Foreign key: none
+  Through model: no
+```
+3. Between Comments and Dishes, use the following options:
+```bash
+$ lb relation
+  Model: Comments
+  Relation type: belongs to
+  Relationship with: dishes
+  Name: dishes
+  Foreign key: none
+```
+4. We want to track who is the author of a comment:
+```bash
+$ lb relation
+  Model: Comments
+  Relation type: belongs to
+  Relationship with: Customer
+  Name: customer
+  Foreign key: customerId
+```
+5. A customer can have multiple posts:
+```bash
+$ lb relation
+  Model: Customer
+  Relation type: has many
+  Relationship with: Comment
+  Name: comments
+  Foreign key: customerId
+  Require through model: no
+```
+
 
 ## How to launch the server
 You need to have a MongoDB database which runs on localhost on port 27017
@@ -84,3 +203,143 @@ You need to have a MongoDB database which runs on localhost on port 27017
 ```bash
 $ node .
 ```
+
+## Some operations on REST API using curl
+
+1. login as admin user
+```bash
+$ curl -X POST --header 'Content-Type: application/json' --header 'Accept: application/json' -d '{"username":"admin", "password":"admin"} \
+ ' 'http://localhost:3000/api/Customers/login'
+```
+Response Body:
+```json
+ {
+   "id": "kSJgIqVd60KC3MUlQYMqbwWbxWqCDGWdHjDmBcMnFJ11Y90mmFiroHNAu1jp9GQY",
+   "ttl": 1209600,
+   "created": "2017-08-14T08:26:10.740Z",
+   "userId": "5991573d5b1faf07d8e9b54f"
+ }
+```
+
+2. set the access token returned in the previous command as the id field
+
+3. Add a new dish
+```bash
+$ curl -X POST --header 'Content-Type: application/json' --header 'Accept: application/json' -d '{ \
+       "name": "Uthapizza", \
+       "image": "images/uthapizza.png", \
+       "category": "mains", \
+       "label": "Hot", \
+       "price": "4.99", \
+       "description": "A unique combination of Indian Uthappam (pancake) and Italian pizza, topped with Cerignola olives, ripe vine cherry tomatoes, Vidalia onion, Guntur chillies and Buffalo Paneer." \
+ }' 'http://localhost:3000/api/dishes?access_token=kSJgIqVd60KC3MUlQYMqbwWbxWqCDGWdHjDmBcMnFJ11Y90mmFiroHNAu1jp9GQY'
+```
+
+4. log out
+```bash
+$ curl -X POST --header 'Content-Type: application/json' --header 'Accept: application/json' 'http://localhost:3000/api/Customers/logout?access_token=kSJgIqVd60KC3MUlQYMqbwWbxWqCDGWdHjDmBcMnFJ11Y90mmFiroHNAu1jp9GQY'
+```
+
+5. login as a common user
+```bash
+$ curl -X POST --header 'Content-Type: application/json' --header 'Accept: application/json' -d '{"username":"common", "password":"azerty"} \
+ ' 'http://localhost:3000/api/Customers/login'
+ ```
+Response Body:
+```json
+ {
+   "id": "WaGmnECNgdBjD9e3Y15VscKzNafqhFsECrROadcEdRguiZzFtEf1LOw2YkiNk83v",
+   "ttl": 1209600,
+   "created": "2017-08-14T08:33:09.329Z",
+   "userId": "5991573d5b1faf07d8e9b550"
+ }
+ ```
+
+6. set the access token returned in the previous command as the id field
+
+7. Do a get on dishes
+```bash
+$ curl -X GET --header 'Accept: application/json' 'http://localhost:3000/api/dishes?access_token=WaGmnECNgdBjD9e3Y15VscKzNafqhFsECrROadcEdRguiZzFtEf1LOw2YkiNk83v'
+```
+Response Body:
+```json
+[
+  {
+    "name": "Uthapizza",
+    "description": "A unique combination of Indian Uthappam (pancake) and Italian pizza, topped with Cerignola olives, ripe vine cherry tomatoes, Vidalia onion, Guntur chillies and Buffalo Paneer.",
+    "category": "mains",
+    "image": "images/uthapizza.png",
+    "label": "Hot",
+    "price": "4.99",
+    "id": "59915fd25b1faf07d8e9b556",
+    "createdAt": "2017-08-14T08:31:14.309Z",
+    "updatedAt": "2017-08-14T08:31:14.309Z"
+  }
+]
+```
+
+8. Add a comment to the dish as the common customer
+```bash
+$ curl -X POST --header 'Content-Type: application/json' --header 'Accept: application/json' -d '{ \
+   "rating": 3, \
+   "comment": "This is a sample comment", \
+   "dishesId": "5991593a5b1faf07d8e9b553", \
+   "customerId": "5991573d5b1faf07d8e9b550" \
+ }' 'http://localhost:3000/api/Comments?access_token=iFDPeQsNTawHhgfTXGUb6ZMWFa2jhz8BaEAR6S0P5Q7pLrJD9rclgtRO6TO4mytb'
+```
+
+9. Do a get on the Comments
+```bash
+$ curl -X GET --header 'Accept: application/json' 'http://localhost:3000/api/Comments?access_token=WaGmnECNgdBjD9e3Y15VscKzNafqhFsECrROadcEdRguiZzFtEf1LOw2YkiNk83v'
+```
+Response Body:
+```json
+[
+  {
+    "rating": 3,
+    "comment": "This is a sample comment",
+    "id": "5991650d5b1faf07d8e9b557",
+    "dishesId": "59915fd25b1faf07d8e9b556",
+    "customerId": "5991573d5b1faf07d8e9b550",
+    "createdAt": "2017-08-14T08:53:33.331Z",
+    "updatedAt": "2017-08-14T08:53:33.331Z"
+  }
+]
+```
+
+10. Do a get on the Comments adding a filter to retrieve informations on the Customer and the Dish
+```bash
+$ curl -X GET --header 'Accept: application/json' 'http://localhost:3000/api/Comments?filter=%7B%22include%22%3A%5B%22dishes%22%2C%20%22customer%22%5D%7D&access_token=WaGmnECNgdBjD9e3Y15VscKzNafqhFsECrROadcEdRguiZzFtEf1LOw2YkiNk83v'
+```
+Response Body:
+```json
+[
+  {
+    "rating": 3,
+    "comment": "This is a sample comment",
+    "id": "5991650d5b1faf07d8e9b557",
+    "dishesId": "59915fd25b1faf07d8e9b556",
+    "customerId": "5991573d5b1faf07d8e9b550",
+    "createdAt": "2017-08-14T08:53:33.331Z",
+    "updatedAt": "2017-08-14T08:53:33.331Z",
+    "dishes": {
+      "name": "Uthapizza",
+      "description": "A unique combination of Indian Uthappam (pancake) and Italian pizza, topped with Cerignola olives, ripe vine cherry tomatoes, Vidalia onion, Guntur chillies and Buffalo Paneer.",
+      "category": "mains",
+      "image": "images/uthapizza.png",
+      "label": "Hot",
+      "price": "4.99",
+      "id": "59915fd25b1faf07d8e9b556",
+      "createdAt": "2017-08-14T08:31:14.309Z",
+      "updatedAt": "2017-08-14T08:31:14.309Z"
+    },
+    "customer": {
+      "username": "common",
+      "email": "common@common.com",
+      "id": "5991573d5b1faf07d8e9b550"
+    }
+  }
+]
+```
+
+Same operations can be done on http://localhost:3000/explorer
